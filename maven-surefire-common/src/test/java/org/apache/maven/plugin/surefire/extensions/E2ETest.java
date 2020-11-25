@@ -27,7 +27,7 @@ import org.apache.maven.surefire.api.event.Event;
 import org.apache.maven.surefire.api.report.ConsoleOutputReceiver;
 import org.apache.maven.surefire.booter.spi.SurefireMasterProcessChannelProcessorFactory;
 import org.apache.maven.surefire.extensions.EventHandler;
-import org.apache.maven.surefire.extensions.ForkNodeArguments;
+import org.apache.maven.surefire.api.fork.ForkNodeArguments;
 import org.apache.maven.surefire.extensions.util.CountdownCloseable;
 import org.junit.Rule;
 import org.junit.Test;

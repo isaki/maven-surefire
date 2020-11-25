@@ -21,7 +21,7 @@ package org.apache.maven.plugin.surefire.extensions;
 
 import org.apache.maven.plugin.surefire.extensions.EventConsumerThread.Memento;
 import org.apache.maven.plugin.surefire.extensions.EventConsumerThread.Segment;
-import org.apache.maven.plugin.surefire.extensions.EventConsumerThread.SegmentType;
+import org.apache.maven.surefire.api.stream.SegmentType;
 import org.apache.maven.plugin.surefire.log.api.ConsoleLogger;
 import org.apache.maven.surefire.api.booter.ForkedProcessEventType;
 import org.apache.maven.surefire.api.event.ConsoleDebugEvent;
@@ -48,7 +48,7 @@ import org.apache.maven.surefire.api.event.TestsetCompletedEvent;
 import org.apache.maven.surefire.api.event.TestsetStartingEvent;
 import org.apache.maven.surefire.api.report.RunMode;
 import org.apache.maven.surefire.extensions.EventHandler;
-import org.apache.maven.surefire.extensions.ForkNodeArguments;
+import org.apache.maven.surefire.api.fork.ForkNodeArguments;
 import org.apache.maven.surefire.extensions.util.CountdownCloseable;
 import org.fest.assertions.Condition;
 import org.junit.Test;
@@ -76,11 +76,11 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.SegmentType.DATA_INT;
-import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.SegmentType.DATA_STRING;
-import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.SegmentType.END_OF_FRAME;
-import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.SegmentType.RUN_MODE;
-import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.SegmentType.STRING_ENCODING;
+import static org.apache.maven.surefire.api.stream.SegmentType.DATA_INTEGER;
+import static org.apache.maven.surefire.api.stream.SegmentType.DATA_STRING;
+import static org.apache.maven.surefire.api.stream.SegmentType.END_OF_FRAME;
+import static org.apache.maven.surefire.api.stream.SegmentType.RUN_MODE;
+import static org.apache.maven.surefire.api.stream.SegmentType.STRING_ENCODING;
 import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.mapEventTypes;
 import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.mapRunModes;
 import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.nextSegmentType;
@@ -799,49 +799,49 @@ public class EventConsumerThreadTest
         assertThat( segmentTypes )
             .hasSize( 13 )
             .satisfies( new InOrder( RUN_MODE, STRING_ENCODING, DATA_STRING, DATA_STRING, DATA_STRING, DATA_STRING,
-                DATA_STRING, DATA_STRING, DATA_INT, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
+                DATA_STRING, DATA_STRING, DATA_INTEGER, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
 
         segmentTypes = nextSegmentType( ForkedProcessEventType.BOOTERCODE_TESTSET_COMPLETED );
         assertThat( segmentTypes )
             .hasSize( 13 )
             .satisfies( new InOrder( RUN_MODE, STRING_ENCODING, DATA_STRING, DATA_STRING, DATA_STRING, DATA_STRING,
-                DATA_STRING, DATA_STRING, DATA_INT, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
+                DATA_STRING, DATA_STRING, DATA_INTEGER, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
 
         segmentTypes = nextSegmentType( ForkedProcessEventType.BOOTERCODE_TEST_STARTING );
         assertThat( segmentTypes )
             .hasSize( 13 )
             .satisfies( new InOrder( RUN_MODE, STRING_ENCODING, DATA_STRING, DATA_STRING, DATA_STRING, DATA_STRING,
-                DATA_STRING, DATA_STRING, DATA_INT, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
+                DATA_STRING, DATA_STRING, DATA_INTEGER, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
 
         segmentTypes = nextSegmentType( BOOTERCODE_TEST_SUCCEEDED );
         assertThat( segmentTypes )
             .hasSize( 13 )
             .satisfies( new InOrder( RUN_MODE, STRING_ENCODING, DATA_STRING, DATA_STRING, DATA_STRING, DATA_STRING,
-                DATA_STRING, DATA_STRING, DATA_INT, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
+                DATA_STRING, DATA_STRING, DATA_INTEGER, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
 
         segmentTypes = nextSegmentType( BOOTERCODE_TEST_FAILED );
         assertThat( segmentTypes )
             .hasSize( 13 )
             .satisfies( new InOrder( RUN_MODE, STRING_ENCODING, DATA_STRING, DATA_STRING, DATA_STRING, DATA_STRING,
-                DATA_STRING, DATA_STRING, DATA_INT, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
+                DATA_STRING, DATA_STRING, DATA_INTEGER, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
 
         segmentTypes = nextSegmentType( ForkedProcessEventType.BOOTERCODE_TEST_SKIPPED );
         assertThat( segmentTypes )
             .hasSize( 13 )
             .satisfies( new InOrder( RUN_MODE, STRING_ENCODING, DATA_STRING, DATA_STRING, DATA_STRING, DATA_STRING,
-                DATA_STRING, DATA_STRING, DATA_INT, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
+                DATA_STRING, DATA_STRING, DATA_INTEGER, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
 
         segmentTypes = nextSegmentType( ForkedProcessEventType.BOOTERCODE_TEST_ERROR );
         assertThat( segmentTypes )
             .hasSize( 13 )
             .satisfies( new InOrder( RUN_MODE, STRING_ENCODING, DATA_STRING, DATA_STRING, DATA_STRING, DATA_STRING,
-                DATA_STRING, DATA_STRING, DATA_INT, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
+                DATA_STRING, DATA_STRING, DATA_INTEGER, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
 
         segmentTypes = nextSegmentType( ForkedProcessEventType.BOOTERCODE_TEST_ASSUMPTIONFAILURE );
         assertThat( segmentTypes )
             .hasSize( 13 )
             .satisfies( new InOrder( RUN_MODE, STRING_ENCODING, DATA_STRING, DATA_STRING, DATA_STRING, DATA_STRING,
-                DATA_STRING, DATA_STRING, DATA_INT, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
+                DATA_STRING, DATA_STRING, DATA_INTEGER, DATA_STRING, DATA_STRING, DATA_STRING, END_OF_FRAME ) );
     }
 
     @Test

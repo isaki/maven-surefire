@@ -29,45 +29,16 @@ import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.LineNumberReader;
 import java.io.PrintStream;
-import java.io.StringReader;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetEncoder;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.copyOfRange;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_BYE;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_CONSOLE_DEBUG;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_CONSOLE_ERROR;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_CONSOLE_INFO;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_CONSOLE_WARNING;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_JVM_EXIT_ERROR;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_NEXT_TEST;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_STDERR;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_STDERR_NEW_LINE;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_STDOUT;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_STDOUT_NEW_LINE;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_STOP_ON_NEXT_TEST;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_SYSPROPS;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_TESTSET_COMPLETED;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_TESTSET_STARTING;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_TEST_ASSUMPTIONFAILURE;
 import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_TEST_ERROR;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_TEST_FAILED;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_TEST_SKIPPED;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_TEST_STARTING;
-import static org.apache.maven.surefire.api.booter.ForkedProcessEventType.BOOTERCODE_TEST_SUCCEEDED;
 import static org.apache.maven.surefire.api.report.RunMode.NORMAL_RUN;
 import static org.apache.maven.surefire.api.util.internal.Channels.newBufferedChannel;
-import static org.apache.maven.surefire.booter.spi.LegacyMasterProcessChannelEncoder.encode;
-import static org.apache.maven.surefire.booter.spi.LegacyMasterProcessChannelEncoder.encodeHeader;
-import static org.apache.maven.surefire.booter.spi.LegacyMasterProcessChannelEncoder.encodeMessage;
-import static org.apache.maven.surefire.booter.spi.LegacyMasterProcessChannelEncoder.encodeOpcode;
-import static org.apache.maven.surefire.booter.spi.LegacyMasterProcessChannelEncoder.estimateBufferLength;
 import static org.fest.assertions.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -83,96 +54,6 @@ public class LegacyMasterProcessChannelEncoderTest
 {
     private static final int ELAPSED_TIME = 102;
     private static final byte[] ELAPSED_TIME_HEXA = new byte[] {0, 0, 0, 0x66};
-
-    @Test
-    public void shouldComputeStreamPreemptiveLength()
-    {
-        CharsetEncoder encoder = UTF_8.newEncoder();
-
-        // :maven-surefire-event:8:sys-prop:10:normal-run:5:UTF-8:0001:kkk:0001:vvv:
-        assertThat( estimateBufferLength( BOOTERCODE_SYSPROPS, NORMAL_RUN, encoder, 0, "k", "v" ) )
-            .isEqualTo( 72 );
-
-        // :maven-surefire-event:16:testset-starting:10:normal-run:5:UTF-8:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:X0001:0001:sss:0001:sss:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_TESTSET_STARTING, NORMAL_RUN, encoder, 1, "s", "s", "s", "s", "s", "s", "s", "s", "s" ) )
-            .isEqualTo( 149 );
-
-        // :maven-surefire-event:17:testset-completed:10:normal-run:5:UTF-8:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:X0001:0001:sss:0001:sss:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_TESTSET_COMPLETED, NORMAL_RUN, encoder, 1, "s", "s", "s", "s", "s", "s", "s", "s", "s" ) )
-            .isEqualTo( 150 );
-
-        // :maven-surefire-event:13:test-starting:10:normal-run:5:UTF-8:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:X0001:0001:sss:0001:sss:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_TEST_STARTING, NORMAL_RUN, encoder, 1, "s", "s", "s", "s", "s", "s", "s", "s", "s" ) )
-            .isEqualTo( 146 );
-
-        // :maven-surefire-event:14:test-succeeded:10:normal-run:5:UTF-8:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:X0001:0001:sss:0001:sss:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_TEST_SUCCEEDED, NORMAL_RUN, encoder, 1, "s", "s", "s", "s", "s", "s", "s", "s", "s" ) )
-            .isEqualTo( 147 );
-
-        // :maven-surefire-event:11:test-failed:10:normal-run:5:UTF-8:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:X0001:0001:sss:0001:sss:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_TEST_FAILED, NORMAL_RUN, encoder, 1, "s", "s", "s", "s", "s", "s", "s", "s", "s" ) )
-            .isEqualTo( 144 );
-
-        // :maven-surefire-event:12:test-skipped:10:normal-run:5:UTF-8:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:X0001:0001:sss:0001:sss:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_TEST_SKIPPED, NORMAL_RUN, encoder, 1, "s", "s", "s", "s", "s", "s", "s", "s", "s" ) )
-            .isEqualTo( 145 );
-
-        // :maven-surefire-event:10:test-error:10:normal-run:5:UTF-8:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:X0001:0001:sss:0001:sss:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_TEST_ERROR, NORMAL_RUN, encoder, 1, "s", "s", "s", "s", "s", "s", "s", "s", "s" ) )
-            .isEqualTo( 143 );
-
-        // :maven-surefire-event:23:test-assumption-failure:10:normal-run:5:UTF-8:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:0001:sss:X0001:0001:sss:0001:sss:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_TEST_ASSUMPTIONFAILURE, NORMAL_RUN, encoder, 1, "s", "s", "s", "s", "s", "s", "s", "s", "s" ) )
-            .isEqualTo( 156 );
-
-        // :maven-surefire-event:14:std-out-stream:10:normal-run:5:UTF-8:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_STDOUT, NORMAL_RUN, encoder, 0, "s" ) )
-            .isEqualTo( 69 );
-
-        // :maven-surefire-event:23:std-out-stream-new-line:10:normal-run:5:UTF-8:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_STDOUT_NEW_LINE, NORMAL_RUN, encoder, 0, "s" ) )
-            .isEqualTo( 78 );
-
-        // :maven-surefire-event:14:std-err-stream:10:normal-run:5:UTF-8:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_STDERR, NORMAL_RUN, encoder, 0, "s" ) )
-            .isEqualTo( 69 );
-
-        // :maven-surefire-event:23:std-err-stream-new-line:10:normal-run:5:UTF-8:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_STDERR_NEW_LINE, NORMAL_RUN, encoder, 0, "s" ) )
-            .isEqualTo( 78 );
-
-        // :maven-surefire-event:16:console-info-log:5:UTF-8:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_CONSOLE_INFO, null, encoder, 0, "s" ) )
-            .isEqualTo( 58 );
-
-        // :maven-surefire-event:17:console-debug-log:5:UTF-8:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_CONSOLE_DEBUG, null, encoder, 0, "s" ) )
-            .isEqualTo( 59 );
-
-        // :maven-surefire-event:19:console-warning-log:5:UTF-8:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_CONSOLE_WARNING, null, encoder, 0, "s" ) )
-            .isEqualTo( 61 );
-
-        // :maven-surefire-event:17:console-error-log:5:UTF-8:0001:sss:
-        assertThat( estimateBufferLength( BOOTERCODE_CONSOLE_ERROR, null, encoder, 0, "s" ) )
-            .isEqualTo( 59 );
-
-        // :maven-surefire-event:3:bye:
-        assertThat( estimateBufferLength( BOOTERCODE_BYE, null, null, 0 ) )
-            .isEqualTo( 28 );
-
-        // :maven-surefire-event:17:stop-on-next-test:
-        assertThat( estimateBufferLength( BOOTERCODE_STOP_ON_NEXT_TEST, null, null, 0 ) )
-            .isEqualTo( 42 );
-
-        // :maven-surefire-event:9:next-test:
-        assertThat( estimateBufferLength( BOOTERCODE_NEXT_TEST, null, null, 0 ) )
-            .isEqualTo( 34 );
-
-        // :maven-surefire-event:14:jvm-exit-error:
-        assertThat( estimateBufferLength( BOOTERCODE_JVM_EXIT_ERROR, null, null, 0 ) )
-            .isEqualTo( 39 );
-    }
 
     @Test
     public void reportEntry() throws IOException
@@ -198,7 +79,9 @@ public class LegacyMasterProcessChannelEncoderTest
         when( reportEntry.getSourceName() ).thenReturn( "pkg.MyTest" );
         when( reportEntry.getStackTraceWriter() ).thenReturn( stackTraceWriter );
 
-        ByteBuffer encoded = encode( BOOTERCODE_TEST_ERROR, NORMAL_RUN, reportEntry, false );
+        Stream out = Stream.newStream();
+        LegacyMasterProcessChannelEncoder encoder = new LegacyMasterProcessChannelEncoder( newBufferedChannel( out ) );
+        ByteBuffer encoded = encoder.encode( BOOTERCODE_TEST_ERROR, NORMAL_RUN, reportEntry, false );
         ByteArrayOutputStream expectedFrame = new ByteArrayOutputStream();
         expectedFrame.write( ":maven-surefire-event:".getBytes( UTF_8 ) );
         expectedFrame.write( (byte) 10 );
@@ -251,7 +134,9 @@ public class LegacyMasterProcessChannelEncoderTest
         assertThat( toArray( encoded ) )
             .isEqualTo( expectedFrame.toByteArray() );
 
-        encoded = encode( BOOTERCODE_TEST_ERROR, NORMAL_RUN, reportEntry, true );
+        out = Stream.newStream();
+        encoder = new LegacyMasterProcessChannelEncoder( newBufferedChannel( out ) );
+        encoded = encoder.encode( BOOTERCODE_TEST_ERROR, NORMAL_RUN, reportEntry, true );
         expectedFrame = new ByteArrayOutputStream();
         expectedFrame.write( ":maven-surefire-event:".getBytes( UTF_8 ) );
         expectedFrame.write( (byte) 10 );
@@ -304,9 +189,8 @@ public class LegacyMasterProcessChannelEncoderTest
         assertThat( toArray( encoded ) )
             .isEqualTo( expectedFrame.toByteArray() );
 
-        Stream out = Stream.newStream();
-        LegacyMasterProcessChannelEncoder encoder = new LegacyMasterProcessChannelEncoder( newBufferedChannel( out ) );
-
+        out = Stream.newStream();
+        encoder = new LegacyMasterProcessChannelEncoder( newBufferedChannel( out ) );
         encoder.testSetStarting( reportEntry, true );
         expectedFrame = new ByteArrayOutputStream();
         expectedFrame.write( ":maven-surefire-event:".getBytes( UTF_8 ) );
@@ -1005,23 +889,6 @@ public class LegacyMasterProcessChannelEncoderTest
     @Test
     public void testSendOpcode()
     {
-        CharsetEncoder encoder = UTF_8.newEncoder();
-        ByteBuffer result = ByteBuffer.allocate( 128 );
-        encodeOpcode( result, BOOTERCODE_TEST_ERROR, NORMAL_RUN );
-        assertThat( toString( result ) )
-                .isEqualTo( ":maven-surefire-event:" + (char) 10 + ":test-error:" + (char) 10 + ":normal-run:" );
-
-        result = ByteBuffer.allocate( 1024 );
-        encodeHeader( encoder, result, BOOTERCODE_TEST_ERROR, NORMAL_RUN );
-        assertThat( toString( result ) )
-                .isEqualTo( ":maven-surefire-event:" + (char) 10 + ":test-error:" + (char) 10 + ":normal-run:"
-                    + (char) 5 + ":UTF-8:" );
-
-        result = encodeMessage( BOOTERCODE_TEST_ERROR, NORMAL_RUN, "msg" );
-        assertThat( toString( result ) )
-                .isEqualTo( ":maven-surefire-event:" + (char) 10 + ":test-error:" + (char) 10 + ":normal-run:"
-                    + (char) 5 + ":UTF-8:\u0000\u0000\u0000\u0003:msg:" );
-
         Channel channel = new Channel();
         new LegacyMasterProcessChannelEncoder( channel ).stdOut( "msg", false );
         assertThat( toString( channel.src ) )
@@ -1033,6 +900,12 @@ public class LegacyMasterProcessChannelEncoderTest
         assertThat( toString( channel.src ) )
                 .isEqualTo( ":maven-surefire-event:" + (char) 14 + ":std-err-stream:" + (char) 10 + ":normal-run:"
                     + (char) 5 + ":UTF-8:\u0000\u0000\u0000\u0001:\u0000:" );
+
+        ByteBuffer result = new LegacyMasterProcessChannelEncoder( new Channel() )
+            .encodeMessage( BOOTERCODE_TEST_ERROR, NORMAL_RUN, "msg" );
+        assertThat( toString( result ) )
+            .isEqualTo( ":maven-surefire-event:" + (char) 10 + ":test-error:" + (char) 10 + ":normal-run:"
+                + (char) 5 + ":UTF-8:\u0000\u0000\u0000\u0003:msg:" );
     }
 
     @Test
@@ -1373,11 +1246,6 @@ public class LegacyMasterProcessChannelEncoderTest
             return out.toByteArray();
         }
 
-        LineNumberReader newReader( Charset streamCharset )
-        {
-            return new LineNumberReader( new StringReader( new String( toByteArray(), streamCharset ) ) );
-        }
-
         static Stream newStream()
         {
             return new Stream( new ByteArrayOutputStream() );
@@ -1412,7 +1280,7 @@ public class LegacyMasterProcessChannelEncoderTest
         ByteBuffer src;
 
         @Override
-        public void writeBuffered( ByteBuffer src ) throws IOException
+        public void writeBuffered( ByteBuffer src )
         {
             this.src = src;
         }
@@ -1424,7 +1292,7 @@ public class LegacyMasterProcessChannelEncoderTest
         }
 
         @Override
-        public int write( ByteBuffer src ) throws IOException
+        public int write( ByteBuffer src )
         {
             this.src = src;
             return 0;
@@ -1439,7 +1307,6 @@ public class LegacyMasterProcessChannelEncoderTest
         @Override
         public void close()
         {
-
         }
     }
 }

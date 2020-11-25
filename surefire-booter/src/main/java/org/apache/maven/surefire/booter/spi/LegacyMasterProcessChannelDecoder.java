@@ -19,29 +19,24 @@ package org.apache.maven.surefire.booter.spi;
  * under the License.
  */
 
+import org.apache.maven.plugin.surefire.log.api.ConsoleLogger;
 import org.apache.maven.surefire.api.booter.Command;
-import org.apache.maven.surefire.api.booter.DumpErrorSingleton;
-import org.apache.maven.surefire.api.booter.MasterProcessCommand;
 import org.apache.maven.surefire.api.booter.MasterProcessChannelDecoder;
-import org.apache.maven.surefire.api.util.internal.ImmutableMap;
+import org.apache.maven.surefire.api.booter.MasterProcessCommand;
+import org.apache.maven.surefire.api.fork.ForkNodeArguments;
+import org.apache.maven.surefire.api.report.RunMode;
+import org.apache.maven.surefire.api.stream.AbstractStreamDecoder.Memento;
+import org.apache.maven.surefire.api.stream.AbstractStreamDecoder.Segment;
+import org.apache.maven.surefire.api.stream.MalformedChannelException;
+import org.apache.maven.surefire.booter.stream.CommandDecoder;
 
 import javax.annotation.Nonnull;
-import java.io.EOFException;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.BYE_ACK;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.MAGIC_NUMBER;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.NOOP;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.RUN_CLASS;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.SHUTDOWN;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.SKIP_SINCE_NEXT_TEST;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.TEST_SET_FINISHED;
+import static java.nio.charset.StandardCharsets.US_ASCII;
 
 /**
  * magic number : opcode [: opcode specific data]*
@@ -52,13 +47,18 @@ import static org.apache.maven.surefire.api.booter.MasterProcessCommand.TEST_SET
  */
 public class LegacyMasterProcessChannelDecoder implements MasterProcessChannelDecoder
 {
-    private static final Map<String, MasterProcessCommand> COMMAND_OPCODES = stringsToOpcodes();
+    // due to have fast and thread-safe Map
+    private static final Map<Segment, MasterProcessCommand> COMMAND_TYPES = segmentsToCmds();
+    private static final Map<Segment, RunMode> RUN_MODES = segmentsToRunModes();
 
-    private final ReadableByteChannel channel;
+    private final CommandDecoder decoder;
+    private Memento memento;
 
-    public LegacyMasterProcessChannelDecoder( @Nonnull ReadableByteChannel channel )
+    public LegacyMasterProcessChannelDecoder( @Nonnull ReadableByteChannel channel,
+                                              @Nonnull ConsoleLogger logger,
+                                              @Nonnull ForkNodeArguments arguments )
     {
-        this.channel = channel;
+        decoder = new CommandDecoder( channel, COMMAND_TYPES, RUN_MODES, logger, arguments );
     }
 
     @Override
@@ -66,99 +66,25 @@ public class LegacyMasterProcessChannelDecoder implements MasterProcessChannelDe
     @SuppressWarnings( "checkstyle:innerassignment" )
     public Command decode() throws IOException
     {
-        List<String> tokens = new ArrayList<>( 3 );
-        StringBuilder token = new StringBuilder( MAGIC_NUMBER.length() );
-        ByteBuffer buffer = ByteBuffer.allocate( 1 );
+        if ( memento == null )
+        {
+            // do not create memento in constructor because the constructor is called in another thread
+            // memento is the thread confinement object
+            memento = decoder.new Memento();
+        }
 
-        start:
         do
         {
-            boolean endOfStream;
-            tokens.clear();
-            token.setLength( 0 );
-            FrameCompletion completion = null;
-            for ( boolean frameStarted = false; !( endOfStream = channel.read( buffer ) == -1 ); completion = null )
+            try
             {
-                buffer.flip();
-                char c = (char) buffer.get();
-                buffer.clear();
-
-                if ( !frameStarted )
-                {
-                    if ( c == ':' )
-                    {
-                        frameStarted = true;
-                        token.setLength( 0 );
-                        tokens.clear();
-                    }
-                }
-                else
-                {
-                    if ( c == ':' )
-                    {
-                        tokens.add( token.toString() );
-                        token.setLength( 0 );
-                        completion = frameCompleteness( tokens );
-                        if ( completion == FrameCompletion.COMPLETE )
-                        {
-                            break;
-                        }
-                        else if ( completion == FrameCompletion.MALFORMED )
-                        {
-                            DumpErrorSingleton.getSingleton()
-                                .dumpStreamText( "Malformed frame with tokens " + tokens );
-                            continue start;
-                        }
-                    }
-                    else
-                    {
-                        token.append( c );
-                    }
-                }
+                return decoder.decode( memento );
             }
-
-            if ( completion == FrameCompletion.COMPLETE )
+            catch ( MalformedChannelException e )
             {
-                MasterProcessCommand cmd = COMMAND_OPCODES.get( tokens.get( 1 ) );
-                if ( tokens.size() == 2 )
-                {
-                    return new Command( cmd );
-                }
-                else if ( tokens.size() == 3 )
-                {
-                    return new Command( cmd, tokens.get( 2 ) );
-                }
-            }
-
-            if ( endOfStream )
-            {
-                throw new EOFException();
+                // a bad stream, already logged the stream down to a dump file or console, and continue till OEF
             }
         }
         while ( true );
-    }
-
-    private static FrameCompletion frameCompleteness( List<String> tokens )
-    {
-        if ( !tokens.isEmpty() && !MAGIC_NUMBER.equals( tokens.get( 0 ) ) )
-        {
-            return FrameCompletion.MALFORMED;
-        }
-
-        if ( tokens.size() >= 2 )
-        {
-            String opcode = tokens.get( 1 );
-            MasterProcessCommand cmd = COMMAND_OPCODES.get( opcode );
-            if ( cmd == null )
-            {
-                return FrameCompletion.MALFORMED;
-            }
-            else if ( cmd.hasDataType() == ( tokens.size() == 3 ) )
-            {
-                return FrameCompletion.COMPLETE;
-            }
-        }
-        return FrameCompletion.NOT_COMPLETE;
     }
 
     @Override
@@ -166,25 +92,25 @@ public class LegacyMasterProcessChannelDecoder implements MasterProcessChannelDe
     {
     }
 
-    /**
-     * Determines whether the frame is complete or malformed.
-     */
-    private enum FrameCompletion
+    private static Map<Segment, MasterProcessCommand> segmentsToCmds()
     {
-        NOT_COMPLETE,
-        COMPLETE,
-        MALFORMED
+        Map<Segment, MasterProcessCommand> commands = new HashMap<>();
+        for ( MasterProcessCommand command : MasterProcessCommand.values() )
+        {
+            byte[] array = command.toString().getBytes( US_ASCII );
+            commands.put( new Segment( array, 0, array.length ), command );
+        }
+        return commands;
     }
 
-    private static Map<String, MasterProcessCommand> stringsToOpcodes()
+    private static Map<Segment, RunMode> segmentsToRunModes()
     {
-        Map<String, MasterProcessCommand> opcodes = new HashMap<>();
-        opcodes.put( "run-testclass", RUN_CLASS );
-        opcodes.put( "testset-finished", TEST_SET_FINISHED );
-        opcodes.put( "skip-since-next-test", SKIP_SINCE_NEXT_TEST );
-        opcodes.put( "shutdown", SHUTDOWN );
-        opcodes.put( "noop", NOOP );
-        opcodes.put( "bye-ack", BYE_ACK );
-        return new ImmutableMap<>( opcodes );
+        Map<Segment, RunMode> runModes = new HashMap<>();
+        for ( RunMode runMode : RunMode.values() )
+        {
+            byte[] array = runMode.getRunmodeBinary();
+            runModes.put( new Segment( array, 0, array.length ), runMode );
+        }
+        return runModes;
     }
 }

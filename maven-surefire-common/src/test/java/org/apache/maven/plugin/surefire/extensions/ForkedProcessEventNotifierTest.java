@@ -39,7 +39,7 @@ import org.apache.maven.surefire.api.util.internal.ObjectUtils;
 import org.apache.maven.surefire.api.util.internal.WritableBufferedByteChannel;
 import org.apache.maven.surefire.booter.spi.LegacyMasterProcessChannelEncoder;
 import org.apache.maven.surefire.extensions.EventHandler;
-import org.apache.maven.surefire.extensions.ForkNodeArguments;
+import org.apache.maven.surefire.api.fork.ForkNodeArguments;
 import org.apache.maven.surefire.extensions.util.CountdownCloseable;
 import org.junit.Rule;
 import org.junit.Test;
@@ -918,7 +918,7 @@ public class ForkedProcessEventNotifierTest
             assertThat( logger.debug.peek() )
                 .contains( ":maven-surefire-event:\u000c:abnormal-run:-:" );
 
-            String dump = "Corrupted STDOUT by directly writing to native stream in forked JVM 0.";
+            String dump = "Corrupted channel by directly writing to native stream in forked JVM 0.";
             assertThat( arguments.dumpStreamText )
                 .hasSize( 1 )
                 .contains( format( dump + " Stream '%s'.", ":maven-surefire-event:\u000c:abnormal-run:-:" ) );

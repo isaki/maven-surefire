@@ -29,21 +29,21 @@ import static java.util.Objects.requireNonNull;
  */
 public enum MasterProcessCommand
 {
-    RUN_CLASS( String.class ),
-    TEST_SET_FINISHED( Void.class ),
-    SKIP_SINCE_NEXT_TEST( Void.class ),
-    SHUTDOWN( String.class ),
+    RUN_CLASS( "run-testclass", String.class ),
+    TEST_SET_FINISHED( "testset-finished", Void.class ),
+    SKIP_SINCE_NEXT_TEST( "skip-since-next-test", Void.class ),
+    SHUTDOWN( "shutdown", String.class ),
 
     /** To tell a forked process that the master process is still alive. Repeated after 10 seconds. */
-    NOOP( Void.class ),
-    BYE_ACK( Void.class );
+    NOOP( "noop", Void.class ),
+    BYE_ACK( "bye-ack", Void.class );
 
-    public static final String MAGIC_NUMBER = "maven-surefire-command";
-
+    private final String value;
     private final Class<?> dataType;
 
-    MasterProcessCommand( Class<?> dataType )
+    MasterProcessCommand( String value, Class<?> dataType )
     {
+        this.value = requireNonNull( value, "value cannot be null" );
         this.dataType = requireNonNull( dataType, "dataType cannot be null" );
     }
 
@@ -55,5 +55,11 @@ public enum MasterProcessCommand
     public boolean hasDataType()
     {
         return dataType != Void.class;
+    }
+
+    @Override
+    public String toString()
+    {
+        return value;
     }
 }

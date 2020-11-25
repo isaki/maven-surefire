@@ -28,7 +28,7 @@ import org.apache.maven.surefire.api.booter.ForkingRunListener;
 import org.apache.maven.surefire.booter.spi.LegacyMasterProcessChannelEncoder;
 import org.apache.maven.surefire.api.event.Event;
 import org.apache.maven.surefire.extensions.EventHandler;
-import org.apache.maven.surefire.extensions.ForkNodeArguments;
+import org.apache.maven.surefire.api.fork.ForkNodeArguments;
 import org.apache.maven.surefire.extensions.util.CountdownCloseable;
 import org.apache.maven.surefire.api.report.CategorizedReportEntry;
 import org.apache.maven.surefire.api.report.ConsoleOutputReceiver;

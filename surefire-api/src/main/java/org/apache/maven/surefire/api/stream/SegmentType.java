@@ -1,4 +1,4 @@
-package org.apache.maven.surefire.api.booter;
+package org.apache.maven.surefire.api.stream;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -19,20 +19,17 @@ package org.apache.maven.surefire.api.booter;
  * under the License.
  */
 
-import java.nio.charset.Charset;
-
-import static java.nio.charset.StandardCharsets.US_ASCII;
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 /**
  *
  */
-public final class Constants
+public enum SegmentType
 {
-    private static final String MAGIC_NUMBER_FOR_EVENTS = "maven-surefire-event";
-    public static final String MAGIC_NUMBER_FOR_COMMANDS = "maven-surefire-command";
-    public static final byte[] MAGIC_NUMBER_FOR_EVENTS_BYTES = MAGIC_NUMBER_FOR_EVENTS.getBytes( US_ASCII );
-    public static final byte[] MAGIC_NUMBER_FOR_COMMANDS_BYTES = MAGIC_NUMBER_FOR_EVENTS.getBytes( US_ASCII );
-    public static final Charset DEFAULT_STREAM_ENCODING = UTF_8;
-    public static final byte[] DEFAULT_STREAM_ENCODING_BYTES = UTF_8.name().getBytes( US_ASCII );
+    RUN_MODE,
+    STRING_ENCODING,
+    DATA_STRING,
+    DATA_INTEGER,
+    DATA_INT,
+    DATA_BYTE,
+    DATA_STRING_ARRAY,
+    END_OF_FRAME
 }

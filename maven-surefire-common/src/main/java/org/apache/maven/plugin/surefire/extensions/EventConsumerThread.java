@@ -47,10 +47,12 @@ import org.apache.maven.surefire.api.event.TestsetStartingEvent;
 import org.apache.maven.surefire.api.report.RunMode;
 import org.apache.maven.surefire.api.report.StackTraceWriter;
 import org.apache.maven.surefire.api.report.TestSetReportEntry;
+import org.apache.maven.surefire.api.stream.AbstractStreamDecoder;
 import org.apache.maven.surefire.extensions.CloseableDaemonThread;
 import org.apache.maven.surefire.extensions.EventHandler;
-import org.apache.maven.surefire.extensions.ForkNodeArguments;
+import org.apache.maven.surefire.api.fork.ForkNodeArguments;
 import org.apache.maven.surefire.extensions.util.CountdownCloseable;
+import org.apache.maven.surefire.api.stream.SegmentType;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
@@ -77,7 +79,7 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.StreamReadStatus.OVERFLOW;
 import static org.apache.maven.plugin.surefire.extensions.EventConsumerThread.StreamReadStatus.UNDERFLOW;
 import static org.apache.maven.surefire.api.booter.Constants.DEFAULT_STREAM_ENCODING;
-import static org.apache.maven.surefire.api.booter.Constants.MAGIC_NUMBER_BYTES;
+import static org.apache.maven.surefire.api.booter.Constants.MAGIC_NUMBER_FOR_EVENTS_BYTES;
 import static org.apache.maven.surefire.api.report.CategorizedReportEntry.reportEntry;
 
 /**
@@ -138,7 +140,7 @@ public class EventConsumerThread extends CloseableDaemonThread
         SegmentType.DATA_STRING,
         SegmentType.DATA_STRING,
         SegmentType.DATA_STRING,
-        SegmentType.DATA_INT,
+        SegmentType.DATA_INTEGER,
         SegmentType.DATA_STRING,
         SegmentType.DATA_STRING,
         SegmentType.DATA_STRING,
@@ -156,6 +158,7 @@ public class EventConsumerThread extends CloseableDaemonThread
     private final EventHandler<Event> eventHandler;
     private final CountdownCloseable countdownCloseable;
     private final ForkNodeArguments arguments;
+    private final AbstractStreamDecoder<Event, ForkedProcessEventType, SegmentType> decoder;
     private volatile boolean disabled;
 
     public EventConsumerThread( @Nonnull String threadName,
@@ -233,7 +236,7 @@ public class EventConsumerThread extends CloseableDaemonThread
                         case DATA_STRING:
                             memento.data.add( readString( memento ) );
                             break;
-                        case DATA_INT:
+                        case DATA_INTEGER:
                             memento.data.add( readInteger( memento ) );
                             break;
                         case END_OF_FRAME:
@@ -280,7 +283,7 @@ public class EventConsumerThread extends CloseableDaemonThread
     protected ForkedProcessEventType readEventType( Map<Segment, ForkedProcessEventType> eventTypes, Memento memento )
         throws IOException, MalformedFrameException
     {
-        int readCount = DELIMITER_LENGTH + MAGIC_NUMBER_BYTES.length + DELIMITER_LENGTH
+        int readCount = DELIMITER_LENGTH + MAGIC_NUMBER_FOR_EVENTS_BYTES.length + DELIMITER_LENGTH
             + BYTE_LENGTH + DELIMITER_LENGTH;
         read( memento, readCount );
         checkHeader( memento );
@@ -371,10 +374,10 @@ public class EventConsumerThread extends CloseableDaemonThread
         int shift = 0;
         try
         {
-            for ( int start = bb.arrayOffset() + bb.position(), length = MAGIC_NUMBER_BYTES.length;
+            for ( int start = bb.arrayOffset() + bb.position(), length = MAGIC_NUMBER_FOR_EVENTS_BYTES.length;
                   shift < length; shift++ )
             {
-                if ( bb.array()[shift + start] != MAGIC_NUMBER_BYTES[shift] )
+                if ( bb.array()[shift + start] != MAGIC_NUMBER_FOR_EVENTS_BYTES[shift] )
                 {
                     throw new MalformedFrameException( memento.line.positionByteBuffer, bb.position() + shift );
                 }
@@ -739,15 +742,6 @@ public class EventConsumerThread extends CloseableDaemonThread
         EOF
     }
 
-    enum SegmentType
-    {
-        RUN_MODE,
-        STRING_ENCODING,
-        DATA_STRING,
-        DATA_INT,
-        END_OF_FRAME
-    }
-
     /**
      * This class avoids locking which gains the performance of this decoder.
      */
@@ -857,24 +851,25 @@ public class EventConsumerThread extends CloseableDaemonThread
                     logger.debug( s );
                 }
 
-                String msg = "Corrupted STDOUT by directly writing to native stream in forked JVM "
+                String msg = "Corrupted channel by directly writing to native stream in forked JVM "
                     + arguments.getForkChannelId() + ".";
                 File dumpFile = arguments.dumpStreamText( msg + " Stream '" + s + "'." );
-                arguments.logWarningAtEnd( msg + " See FAQ web page and the dump file " + dumpFile.getAbsolutePath() );
+                arguments.logWarningAtEnd( msg + " See FAQ web page and the dump file "
+                    + dumpFile.getAbsolutePath() );
             }
         }
     }
 
-    class Memento
+    public final class Memento
     {
         private final CharsetDecoder defaultDecoder;
         private CharsetDecoder currentDecoder;
-        final BufferedStream line = new BufferedStream( 32 );
-        final List<Object> data = new ArrayList<>();
-        final CharBuffer cb = CharBuffer.allocate( BUFFER_SIZE );
-        final ByteBuffer bb = ByteBuffer.allocate( BUFFER_SIZE );
+        private final BufferedStream line = new BufferedStream( 32 );
+        private final List<Object> data = new ArrayList<>();
+        private final CharBuffer cb = CharBuffer.allocate( BUFFER_SIZE );
+        private final ByteBuffer bb = ByteBuffer.allocate( BUFFER_SIZE );
 
-        Memento()
+        public Memento()
         {
             defaultDecoder = DEFAULT_STREAM_ENCODING.newDecoder()
                 .onMalformedInput( REPLACE )
@@ -887,7 +882,7 @@ public class EventConsumerThread extends CloseableDaemonThread
             data.clear();
         }
 
-        CharsetDecoder getDecoder()
+        public CharsetDecoder getDecoder()
         {
             return currentDecoder == null ? defaultDecoder : currentDecoder;
         }

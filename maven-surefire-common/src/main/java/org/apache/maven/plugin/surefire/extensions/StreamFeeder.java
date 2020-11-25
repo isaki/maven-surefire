@@ -24,7 +24,6 @@ import org.apache.maven.surefire.api.booter.Command;
 import org.apache.maven.surefire.api.booter.MasterProcessCommand;
 import org.apache.maven.surefire.extensions.CloseableDaemonThread;
 import org.apache.maven.surefire.extensions.CommandReader;
-import org.apache.maven.surefire.api.util.internal.ImmutableMap;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -36,13 +35,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.BYE_ACK;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.MAGIC_NUMBER;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.NOOP;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.RUN_CLASS;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.SHUTDOWN;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.SKIP_SINCE_NEXT_TEST;
-import static org.apache.maven.surefire.api.booter.MasterProcessCommand.TEST_SET_FINISHED;
+import static org.apache.maven.surefire.api.booter.Constants.MAGIC_NUMBER_FOR_COMMANDS;
 
 /**
  * Commands which are sent from plugin to the forked jvm.
@@ -59,7 +52,7 @@ import static org.apache.maven.surefire.api.booter.MasterProcessCommand.TEST_SET
  */
 public class StreamFeeder extends CloseableDaemonThread
 {
-    private static final Map<MasterProcessCommand, String> COMMAND_OPCODES = opcodesToStrings();
+    private static final Map<MasterProcessCommand, String> COMMAND_TYPES = opcodesToStrings();
 
     private final WritableByteChannel channel;
     private final CommandReader commandReader;
@@ -142,7 +135,7 @@ public class StreamFeeder extends CloseableDaemonThread
             throw new IllegalArgumentException( "Data type can be only " + String.class );
         }
 
-        return encode( COMMAND_OPCODES.get( cmdType ), data )
+        return encode( COMMAND_TYPES.get( cmdType ), data )
             .toString()
             .getBytes( US_ASCII );
     }
@@ -160,7 +153,7 @@ public class StreamFeeder extends CloseableDaemonThread
             throw new IllegalArgumentException( "Data type can be only " + cmdType.getDataType() );
         }
 
-        return encode( COMMAND_OPCODES.get( cmdType ), null )
+        return encode( COMMAND_TYPES.get( cmdType ), null )
             .toString()
             .getBytes( US_ASCII );
     }
@@ -176,7 +169,7 @@ public class StreamFeeder extends CloseableDaemonThread
     {
         StringBuilder s = new StringBuilder( 128 )
             .append( ':' )
-            .append( MAGIC_NUMBER )
+            .append( MAGIC_NUMBER_FOR_COMMANDS )
             .append( ':' )
             .append( operation );
 
@@ -192,12 +185,10 @@ public class StreamFeeder extends CloseableDaemonThread
     private static Map<MasterProcessCommand, String> opcodesToStrings()
     {
         Map<MasterProcessCommand, String> opcodes = new HashMap<>();
-        opcodes.put( RUN_CLASS, "run-testclass" );
-        opcodes.put( TEST_SET_FINISHED, "testset-finished" );
-        opcodes.put( SKIP_SINCE_NEXT_TEST, "skip-since-next-test" );
-        opcodes.put( SHUTDOWN, "shutdown" );
-        opcodes.put( NOOP, "noop" );
-        opcodes.put( BYE_ACK, "bye-ack" );
-        return new ImmutableMap<>( opcodes );
+        for ( MasterProcessCommand e : MasterProcessCommand.values() )
+        {
+            opcodes.put( e, e.toString() );
+        }
+        return opcodes;
     }
 }
