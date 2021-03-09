@@ -33,6 +33,9 @@ jobs:
     - stage: mvn build
       script: travis_wait 30 mvn clean install -e -B -V -nsu -P run-its -DskipITs -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
 
+    - stage: RAT
+      script: sudo cat target/rat.txt
+
 branches:
   only:
   - master
