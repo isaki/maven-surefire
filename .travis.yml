@@ -35,7 +35,3 @@ jobs:
 
     - stage: RAT
       script: sudo cat target/rat.txt
-
-branches:
-  only:
-  - master
